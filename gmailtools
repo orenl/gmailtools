@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# GmailTools
+# Copyright (C) 2020, Oren Laadan
+#
+# All rights reserved.
+#
+# This source code is licensed under the 3-clause BSD license found in the
+# LICENSE file in the root directory of this source tree.
+#
+
+# helper script to setup virtualenv if needed
+
+if [ -d venv -a -z VIRTUAL_ENV ]; then
+	source venv/activate
+fi
+
+if [ $(basename "$0") = "$0" ]; then
+	exec gmailtools.py "$@"
+else
+	exec $(dirname "$0")/gmailtools.py "$@"
+fi
+

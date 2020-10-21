@@ -1,0 +1,11 @@
+# ignore credentials files (with secrets)
+credentials*.json
+oauth2token*.json
+
+# ignore virtualenv setup
+venv.freeze
+venv
+
+# miscellaneous
+*.pyc
+.*.sw?
