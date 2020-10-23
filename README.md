@@ -80,6 +80,11 @@ authentication procedure. This typically involves a new browser popup:
 ## Feedbacks and contributions
 
 Bugs, issues and contributions can be requested on the [official Github project][gmailtools].
+
+Contributions should include a 'Signed-off-by' statement in the commit message,
+by which the developer attests ownership of the contribution and agrees to the
+[Developer Certificate of Origin 1.1](http://developercertificate.org/).
+
 When reporting issues, please provide the python version, command-line options
 used, logs/errors, and the steps to reproduce the error.
 
