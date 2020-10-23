@@ -260,7 +260,7 @@ def relabel(args):
     #
     # in step (5), if there are more than UNLABELED_MANY unlabeled
     # messages and they are at least half the thread size, then we
-    # relabel the entire thread; otherwise relable the individual
+    # relabel the entire thread; otherwise re-label the individual
     # messages (as a batch).
     #
 
@@ -358,7 +358,7 @@ def parse_arg_date(arg):
 
 def parse_args():
     """Parse the command line argumnets.
-    Returns: populated argumnet namespace.
+    Returns: populated argument namespace.
     """
 
     parser = argparse.ArgumentParser(prog='gmailtools.py', add_help=False)
@@ -376,7 +376,7 @@ def parse_args():
     group2 = parser.add_argument_group()
     group2.add_argument('--dry-run', action='store_true', dest='dryrun',
             default=False,
-            help='run in dru-run mode (do not modify anything)')
+            help='run in dry-run mode (do not modify anything)')
 
     group3 = parser.add_argument_group()
     group3.add_argument('--creds', dest='credsfile', metavar='<file>',
