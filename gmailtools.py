@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import sys
+import time
 
 # date/time parsing (--since <date>)
 import datetime
@@ -84,6 +85,55 @@ class _Context:
 ########################################################################
 # gmail api helpers
 
+class RateLimit(object):
+    """Simple rate limiter
+    Ensure that an operation will not be executed more at more than a given
+    rate. Useful to make sure a client complies with a server's api quotas.
+
+    RateLimiter is initialized with a 'rate'. It implements a "token bucket"
+    of initial size 'rate', refilled at 'rate' tokens per second. A caller
+    uses tokens from the bucket as available, or blocks until sufficiently
+    refills.
+
+    Typical usage:
+        ...
+        limiter = RateLimiter(rate)   # 'rate' is max rate per second
+        ...
+        limiter.wait(units)           # use 'units' tokens (wait if needed)
+        do_api_call(...)
+        ...
+    """
+
+    def __init__(self, rate):
+        self.rate = rate
+        self.units = float(rate)
+        self.time = datetime.datetime.now()
+
+    def _update(self):
+        now = datetime.datetime.now()
+        delta = now - self.time
+        units = (delta.microseconds/1000000 + delta.seconds) * self.rate
+        self.units = min(self.units + units, self.rate)
+        self.time = now
+
+    def wait(self, units=1):
+        """try to use tokens, wait for bucket to refill if needed
+        Args: units: number of tokens requested
+        """
+
+        if units > self.rate:
+            raise Exception("ratelimit: request too big (req: {}, max {})".
+                format(units, self.rate))
+        self._update()
+        while units > self.units:
+            delta = (units - self.units) / self.rate
+            time.sleep(delta)
+            self._update()
+        self.units = self.units - units
+
+########################################################################
+# gmail api helpers
+
 def get_gmail_service(creds_path, token_path):
     """Prepares and returns the credentials to access the API.
     Returns: the credentials object.
@@ -125,9 +175,11 @@ def get_labels(service):
 
     _Context.set('Label: retrieving list of labels')
 
-    response = service.users().labels().list(userId='me').execute()
-    labels = response.get('labels', [])
+    limiter.wait(RATE_LABELS_LIST)
+    request = service.users().labels().list(userId='me')
+    response = request.execute()
 
+    labels = response.get('labels', [])
     return labels
 
 def is_user_label(label):
@@ -168,9 +220,9 @@ def get_threads(service, labels=None, query=None):
     _Context.set('Label {}: retrieving list of threads'.
             format(labels_name(labels)))
 
+    limiter.wait(RATE_THREADS_LIST)
     request = service.users().threads().list(
             userId='me', labelIds=labels_ids(labels), q=query)
-
     response = request.execute()
 
     threads = response.get('threads', [])
@@ -178,7 +230,9 @@ def get_threads(service, labels=None, query=None):
         yield thread
 
     while response.get('nextPageToken'):
-        request = service.users().threads().list_next(previous_request=request, previous_response=response)
+        limiter.wait(RATE_THREADS_LIST)
+        request = service.users().threads().list_next(
+                previous_request=request, previous_response=response)
         response = request.execute()
         threads = response.get('threads', [])
         for thread in threads:
@@ -199,7 +253,9 @@ def thread_add_label(service, thread, label):
     tid = thread['id']
     body = { "addLabelIds": [label['id']] }
 
-    response = service.users().threads().modify(userId='me', id=tid, body=body).execute()
+    limiter.wait(RATE_THREADS_MODIFY)
+    request = service.users().threads().modify(userId='me', id=tid, body=body)
+    response = request.execute()
 
 def thread_get_messages(service, thread):
     """Get the list of messages in a given thread.
@@ -210,9 +266,11 @@ def thread_get_messages(service, thread):
 
     _Context.set('Thread {}: retrieving list of messages'.format(thread['id']))
 
-    response = service.users().threads().get(userId='me', format='minimal', id=thread['id']).execute()
-    messages = response.get('messages', [])
+    limiter.wait(RATE_THREADS_GET)
+    request = service.users().threads().get(userId='me', format='minimal', id=thread['id'])
+    response = request.execute()
 
+    messages = response.get('messages', [])
     return messages
 
 def message_has_label(message, label):
@@ -436,6 +494,9 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    global limiter
+    limiter = RateLimit(RATE_LIMIT)
 
     logleveldict = { False: logging.INFO, True: logging.DEBUG }
     loglevel = logleveldict[args.debug]
