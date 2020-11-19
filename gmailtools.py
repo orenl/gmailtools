@@ -136,6 +136,8 @@ class RateLimit(object):
 
 def get_gmail_service(creds_path, token_path):
     """Prepares and returns the credentials to access the API.
+    Args: creds_path: path to credentials file (json)
+          token_path: path to saved token file (json)
     Returns: the credentials object.
     """
 
@@ -198,6 +200,10 @@ def is_user_label(label):
     return False
 
 def labels_name(labels):
+    """Returns a comma-separate list of label names
+    Args: labels: list of label objects.
+    Returns: string with comma-separated labels names.
+    """
     if type(labels) is list:
         return ','.join([ l['name'] for l in labels ])
     else:
@@ -213,7 +219,7 @@ def get_threads(service, labels=None, query=None):
     """Generator for the list of threads with this label.
     Args: service: gmail api service object.
           label: label that the threads should have.
-          query: filter query for gmail api
+          query: filter query for gmail api.
     Returns: thread objects.
     """
 
@@ -245,7 +251,6 @@ def thread_add_label(service, thread, label):
     Args: service: gmail api service object.
           thread: affected thread.
           label: label to add.
-    Returns: N/A
     """
 
     _Context.set('Thread {}: adding label {}'.format(thread['id'], label['name']))
@@ -261,7 +266,7 @@ def thread_get_messages(service, thread):
     """Get the list of messages in a given thread.
     Args: service: gmail api service object.
           thread: thread from which to get the messages.
-    Returns: list of messages obects (minimal format: only id and label).
+    Returns: list of messages objects (minimal format: only id and label).
     """
 
     _Context.set('Thread {}: retrieving list of messages'.format(thread['id']))
@@ -287,7 +292,6 @@ def messages_add_label(service, messages, label):
     Args: service: gmail api service object.
           messages: list of affected messages.
           label: label to add.
-    Returns: N/A
     """
 
     _Context.set('Thread {}: adding label {} (messages: {})'.format(
@@ -298,16 +302,16 @@ def messages_add_label(service, messages, label):
         'addLabelIds': [label['id']],
         }
 
-    response = service.users().messages().batchModify(userId='me', body=body).execute()
+    limiter.wait(RATE_MESSAGES_BATCH_MODIFY)
+    request = service.users().messages().batchModify(userId='me', body=body)
+    response = request.execute()
 
 ########################################################################
 # subcommands
 
 def relabel(args):
     """Relabel all unlabeled messages in a labeled threads.
-    Args: creds_path: path to credentials file (json)
-          token_path: path to saved token file (json)
-    Returns: N/A
+    Args: args: command line arguments
     """
 
     service = get_gmail_service(creds_path=args.credsfile, token_path=args.tokenfile)
@@ -391,7 +395,7 @@ def parse_arg_date(arg):
          'NN day|day|days ago',
          'NN wk|wks|week|weeks|w ago'
          'NN yr|yrs|year|years|y ago'
-    Args: date argument.
+    Args: arg: argument to parse
     Returns: date in 'YYYY-MM-DD' format.
     """
 
@@ -422,7 +426,7 @@ def parse_arg_date(arg):
         raise argparse.ArgumentTypeError('invalid <date> format')
 
 def parse_args():
-    """Parse the command line argumnets.
+    """Parse the command line arguments.
     Returns: populated argument namespace.
     """
 
