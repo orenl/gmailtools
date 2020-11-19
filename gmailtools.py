@@ -56,8 +56,14 @@ CREDS_FILE = 'credentials.json'
 # file to save existing token
 TOKEN_FILE = 'oauth2token.json'
 
-# min unlabled msgs to label entire thread (instead of batched message)
-UNLABELED_MANY = 10
+# gmail api rate limits (calls per second)
+# https://developers.google.com/gmail/api/reference/quota (as of Nov 16, 2020)
+RATE_LABELS_LIST = 1
+RATE_THREADS_LIST = 10
+RATE_THREADS_GET = 10
+RATE_THREADS_MODIFY = 10
+RATE_MESSAGES_BATCH_MODIFY = 50
+RATE_LIMIT = 250
 
 ########################################################################
 # _statusbar
@@ -296,23 +302,24 @@ def relabel(args):
             logging.info('|- thread: {}, un/labeled messages {:>2}/{:<2}'.
                     format(thread['id'], len(no_label), len(messages)))
 
-            # If there are many unlabled messages (at least half of the total
-            # messages in the thread) then apply labels on the entire thread.
+            if len(no_label) == 0:
+                continue
 
-            if len(no_label) > UNLABELED_MANY and len(no_label) >= len(messages) / 2:
+            # Can use either 'threads.modify' or 'messages.batchmodify' api calls;
+            # Choose the one that is cheaper in terms of api quota usage.
+
+            if RATE_THREADS_MODIFY < RATE_MESSAGES_BATCH_MODIFY:
                 if args.dryrun:
                     logging.debug(' |- thread {}: re-label {}'.
                             format(thread['id'], label['name']))
                     continue
                 thread_add_label(service, thread, label)
-            elif len(no_label) > 0:
+            else:
                 if args.dryrun:
                     logging.debug(' |- thread {}: messages {}'.
                             format(thread['id'], no_label))
                     continue
                 messages_add_label(service, no_label, label)
-            else:
-                pass
 
     logging.info('Done')
 
